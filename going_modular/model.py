@@ -32,7 +32,7 @@ class PatchEmbedding(nn.Module):
         #after conv1 we have [batch_size, embedding_size, H/patch_size, W/path_size]:[32, 768, 20, 20]
         self.flatten = nn.Flatten(start_dim=2, end_dim=3)
 
-        
+        #our kenels weight and biases
         conv_weights = nn.Parameter(self.vit_dict['conv_proj.weight'])
         conv_bias = nn.Parameter(self.vit_dict['conv_proj.bias'])
         self.conv1.weight = conv_weights
@@ -71,9 +71,11 @@ class Encoder(nn.Module):
 
         self.embedding_size = 768
 
+        #first we should patch our images
         self.patch_embedding = PatchEmbedding(in_channel=in_channel, 
                                               patch_size=patch_size, 
                                               embedding_size=self.embedding_size)
+        
 
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_size, 
                                                         nhead=12, 
@@ -81,9 +83,10 @@ class Encoder(nn.Module):
                                                         activation='gelu',
                                                         dropout=0.0,
                                                         batch_first=True)
-        
+        #feed our embedded images to encoder
         self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=12)
 
+        #use pretrained weights for our model in encoder for self-attentions, layernorms, mlps 
         for i in range(len(self.transformer_encoder.layers)):
             s = "encoder.layers.encoder_layer_"
             self.transformer_encoder.layers[i].self_attn.out_proj.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.self_attention.out_proj.weight"])
@@ -101,3 +104,28 @@ class Encoder(nn.Module):
         out = self.patch_embedding(input)
         out = self.transformer_encoder(out)
         return out
+    
+
+
+
+# # Define a simple model with 4 ConvTranspose2d layers for upsampling
+class Decoder(nn.Module):
+    def __init__(self, 
+                 in_channels:int=768,
+                 num_pixel_classes:int=19):
+        super(Decoder, self).__init__()
+
+        self.num_classes = num_pixel_classes
+        self.in_channel = in_channels
+
+        self.layer1 = nn.ConvTranspose2d(self.in_channel, 384, kernel_size=4, stride=2, padding=1)
+        self.layer2 = nn.ConvTranspose2d(384, 192, kernel_size=4, stride=2, padding=1)
+        self.layer3 = nn.ConvTranspose2d(192, 96, kernel_size=4, stride=2, padding=1)
+        self.layer4 = nn.ConvTranspose2d(96, self.num_classes, kernel_size=4, stride=2, padding=1)
+
+    def forward(self, x):
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        return x
