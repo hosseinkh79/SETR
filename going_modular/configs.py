@@ -22,8 +22,8 @@ VALID_IMAGE_PATH = os.path.join(DATASET_PATH, 'images')
 VALID_MASK_PATH = os.path.join(DATASET_PATH, 'masks')
 
 #our vit weight dict
-__vit = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights)
-vit_dict = __vit.state_dict()
+vit = torchvision.models.vit_b_16(weights=torchvision.models.ViT_B_16_Weights)
+vit_dict = vit.state_dict()
 
 # print(vit_dict)
 
