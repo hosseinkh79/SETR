@@ -63,6 +63,12 @@ def one_step_train(model,
         loss.backward()
         optimizer.step()
 
+        if batch % 3 == 0 :
+             print(
+                  f'loss : {loss.item()} | '
+                  f'iou : {iou}'
+                  ) 
+
  
 
     train_loss = train_loss/len(train_dataloader)
@@ -122,6 +128,9 @@ def one_step_test(model,
         iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
         test_iou += iou
 
+
+
+
     test_iou = test_iou / len(test_dataloader)
     test_loss = test_loss/ len(test_dataloader)
 
@@ -146,28 +155,28 @@ def train(model,
     
     for epoch in range(epochs):
 
-        train_loss, train_acc = one_step_train(model,
+        train_loss, train_iou = one_step_train(model,
                                                 train_dataloader,
                                                 loss_fn, 
                                                 optimizer,
                                                 device)
 
-        test_loss, test_acc = one_step_test(model,
+        test_loss, test_iou = one_step_test(model,
                                             test_dataloader,
                                             loss_fn,
                                             device)
 
         results['train_loss'].append(train_loss)
-        results['train_iou'].append(train_acc)
+        results['train_iou'].append(train_iou)
         results['test_loss'].append(test_loss)
-        results['test_iou'].append(test_acc)
+        results['test_iou'].append(test_iou)
 
         print(
           f"Epoch: {epoch+1} | "
           f"train_loss: {train_loss:.4f} | "
-          f"train_iou: {train_acc:.4f} | "
+          f"train_iou: {train_iou:.4f} | "
           f"test_loss: {test_loss:.4f} | "
-          f"test_iou: {test_acc:.4f}"
+          f"test_iou: {test_iou:.4f}"
         )
         
     return results
