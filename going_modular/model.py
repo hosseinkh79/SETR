@@ -1,5 +1,7 @@
 from going_modular import configs
 from torch import nn
+import torch
+
 
 class PatchEmbedding(nn.Module):
     def __init__(self, 
@@ -47,7 +49,8 @@ class PatchEmbedding(nn.Module):
         #for images with 128*128
         # just for our little pics. main code is above. for next iterates with actuall pic we should 
         #comment two of code below and uncomment two above code
-        pos_embed = pos_embed[:, :64, :]
+        a = int(configs.IMAGE_WIDTH / ((self.patch_size)))**2
+        pos_embed = pos_embed[:, :int(a), :]
         self.pose_embedd = pos_embed
         # print(f'self_poseembedd size is {self.pose_embedd.shape}')
 
@@ -55,8 +58,12 @@ class PatchEmbedding(nn.Module):
 
         assert input.shape[2] % self.patch_size == 0, "H and W of image should be diviseable with patchsize"
         out = self.conv1(input)
+
         out = self.flatten(out)
+
         out = out.permute(0, 2, 1)
+        # print(f'out shape is {out.shape}')
+        # print(f'pose_embedd out is {self.pose_embedd.shape}')
         out = out + self.pose_embedd
         return out
 
@@ -66,10 +73,11 @@ class PatchEmbedding(nn.Module):
 class Encoder(nn.Module):
     def __init__(self, 
                  in_channel:int=3,
-                 patch_size:int=16):
+                 patch_size:int=16,
+                 embedd_size:int=768):
         super().__init__()
 
-        self.embedding_size = 768
+        self.embedding_size = embedd_size
 
         #first we should patch our images
         self.patch_embedding = PatchEmbedding(in_channel=in_channel, 
@@ -113,7 +121,7 @@ class Decoder(nn.Module):
     def __init__(self, 
                  in_channels:int=768,
                  num_pixel_classes:int=19):
-        super(Decoder, self).__init__()
+        super().__init__()
 
         self.num_classes = num_pixel_classes
         self.in_channel = in_channels
@@ -129,3 +137,39 @@ class Decoder(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
         return x
+    
+#final model
+class SETR(nn.Module):
+    def __init__(self,
+                 in_channel:int=3,
+                 patch_size:int=16):
+        super().__init__()
+
+        self.in_channel = in_channel
+        self.patch_size = patch_size
+
+
+        self.encoder = Encoder(in_channel=self.in_channel,
+                               patch_size=self.patch_size)
+        
+        self.decoder = Decoder(num_pixel_classes=19)
+
+
+    def forward(self, input):
+
+        batch_size = input.shape[0]
+        # number_of_patches = input.shape[2]**input.shape[3] / self.patch_size**2
+        width_per_patch = int(input.shape[2] / self.patch_size)
+
+        #encoder output is in size of like this:
+        #(batch_size, number of patches=64 for imagesize 128*128 and 196 for image size 224*224, embedsize=768)
+        out = self.encoder(input)
+        
+        #out shape is (batch_size, 64=HW/Patchsize**2=number of our patches, 768)
+        #but we should feed our images as shape of this(based of paper) (batch_size, 768, 8or16, 8or16)
+        out = out.permute(0, 2, 1) 
+        out = out.reshape(batch_size, -1, width_per_patch, width_per_patch) 
+
+        #our decoder gives ((batch_size, channel_size=768, hight=8, width=8))
+        out = self.decoder(out)
+        return out
