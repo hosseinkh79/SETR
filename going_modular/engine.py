@@ -66,8 +66,7 @@ def one_step_train(model,
         if batch % 3 == 0 :
              print(
                   f'loss : {loss.item()} | '
-                  f'iou : {iou}'
-                  ) 
+                  f'iou : {iou}') 
 
  
 
