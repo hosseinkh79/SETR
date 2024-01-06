@@ -63,13 +63,6 @@ def one_step_train(model,
         loss.backward()
         optimizer.step()
 
-        if batch % 3 == 0 :
-             print(
-                  f'loss : {loss.item()} | '
-                  f'iou : {iou}') 
-
- 
-
     train_loss = train_loss/len(train_dataloader)
     test_iou = test_iou/len(train_dataloader)
 

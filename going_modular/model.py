@@ -1,36 +1,27 @@
-from going_modular import configs
+from going_modular.configs import configs
 from torch import nn
 import torch
 
 
 class PatchEmbedding(nn.Module):
-    def __init__(self, 
-                 in_channel:int=3,
-                 patch_size:int=16,
-                 embedding_size:int=768,
-                 preTrained_weights:dict=configs.vit_dict):
+    def __init__(self, configs):
         super().__init__()
-
-        self.pose_embedd = None
         
-        self.vit_dict = preTrained_weights
+        self.vit_dict = configs['Vit_Dict']
 
         #input image channels
-        self.in_channels = in_channel
+        self.in_channels = configs['InChannel_Size']
 
         #patch size : cut our input images to range of this. 
         #number of patches is HW/Patchsize**2 (H:hight, W:width)
         #our each patch sizes after patching and flatten is patchSize**2 * inChannelSize
-        self.patch_size = patch_size
-
-        #our each patch sizes after patching and flatten is patchSize**2 * inChannelSize
-        self.embedding_size = embedding_size
-        
+        self.patch_size = configs['Patch_Size']
+        self.embedding_size = configs['Embed_Size']
         self.conv1 = nn.Conv2d(in_channels=self.in_channels,
                                out_channels=self.embedding_size,
                                kernel_size=self.patch_size,
                                stride=self.patch_size)
-        
+    
         #after conv1 we have [batch_size, embedding_size, H/patch_size, W/path_size]:[32, 768, 20, 20]
         self.flatten = nn.Flatten(start_dim=2, end_dim=3)
 
@@ -41,23 +32,15 @@ class PatchEmbedding(nn.Module):
         self.conv1.bias = conv_bias
 
         #add pose embedding with weights of vit-base-16. for images with 224*224
-        pos_embed = nn.Parameter(self.vit_dict['encoder.pos_embedding'])
-        # self.pose_embedd = pos_embed[:, 1:, :]
-        # print(f'pose embedd size is {self.pose_embedd.shape}')
+        num_pose = int(configs['Image_Width']/self.patch_size) ** 2
+        self.pose_embedd = nn.Parameter(data=torch.randn(1, num_pose, self.embedding_size))
 
-
-        #for images with 128*128
-        # just for our little pics. main code is above. for next iterates with actuall pic we should 
-        #comment two of code below and uncomment two above code
-        a = int(configs.IMAGE_WIDTH / ((self.patch_size)))**2
-        pos_embed = pos_embed[:, :int(a), :]
-        self.pose_embedd = pos_embed
-        # print(f'self_poseembedd size is {self.pose_embedd.shape}')
 
     def forward(self, input):
 
         assert input.shape[2] % self.patch_size == 0, "H and W of image should be diviseable with patchsize"
         out = self.conv1(input)
+        # print(f'out after conv1 : {out.shape}')
 
         out = self.flatten(out)
 
@@ -71,20 +54,11 @@ class PatchEmbedding(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, 
-                 in_channel:int=3,
-                 patch_size:int=16,
-                 embedd_size:int=768):
+    def __init__(self, configs):
         super().__init__()
 
-        self.embedding_size = embedd_size
-
-        #first we should patch our images
-        self.patch_embedding = PatchEmbedding(in_channel=in_channel, 
-                                              patch_size=patch_size, 
-                                              embedding_size=self.embedding_size)
-        
-
+        self.embedding_size = configs['Embed_Size']
+    
         self.encoder_layer = nn.TransformerEncoderLayer(d_model=self.embedding_size, 
                                                         nhead=12, 
                                                         dim_feedforward=3072, 
@@ -97,34 +71,31 @@ class Encoder(nn.Module):
         #use pretrained weights for our model in encoder for self-attentions, layernorms, mlps 
         for i in range(len(self.transformer_encoder.layers)):
             s = "encoder.layers.encoder_layer_"
-            self.transformer_encoder.layers[i].self_attn.out_proj.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.self_attention.out_proj.weight"])
-            self.transformer_encoder.layers[i].self_attn.out_proj.bias = nn.Parameter(configs.vit_dict[f"{s}{i}.self_attention.out_proj.bias"])
-            self.transformer_encoder.layers[i].norm1.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.ln_1.weight"])
-            self.transformer_encoder.layers[i].norm1.bias = nn.Parameter(configs.vit_dict[f"{s}{i}.ln_1.bias"])
-            self.transformer_encoder.layers[i].norm2.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.ln_2.weight"])
-            self.transformer_encoder.layers[i].norm2.bias = nn.Parameter(configs.vit_dict[f"{s}{i}.ln_2.bias"])
-            self.transformer_encoder.layers[i].linear1.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.mlp.0.weight"])
-            self.transformer_encoder.layers[i].linear1.bias = nn.Parameter(configs.vit_dict[f"{s}{i}.mlp.0.bias"])
-            self.transformer_encoder.layers[i].linear2.weight = nn.Parameter(configs.vit_dict[f"{s}{i}.mlp.3.weight"])
-            self.transformer_encoder.layers[i].linear2.bias = nn.Parameter(configs.vit_dict[f"{s}{i}.mlp.3.bias"])
+            self.transformer_encoder.layers[i].self_attn.out_proj.weight = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.self_attention.out_proj.weight"])
+            self.transformer_encoder.layers[i].self_attn.out_proj.bias = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.self_attention.out_proj.bias"])
+            self.transformer_encoder.layers[i].norm1.weight = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.ln_1.weight"])
+            self.transformer_encoder.layers[i].norm1.bias = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.ln_1.bias"])
+            self.transformer_encoder.layers[i].norm2.weight = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.ln_2.weight"])
+            self.transformer_encoder.layers[i].norm2.bias = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.ln_2.bias"])
+            self.transformer_encoder.layers[i].linear1.weight = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.mlp.0.weight"])
+            self.transformer_encoder.layers[i].linear1.bias = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.mlp.0.bias"])
+            self.transformer_encoder.layers[i].linear2.weight = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.mlp.3.weight"])
+            self.transformer_encoder.layers[i].linear2.bias = nn.Parameter(configs['Vit_Dict'][f"{s}{i}.mlp.3.bias"])
         
     def forward(self, input):
-        out = self.patch_embedding(input)
-        out = self.transformer_encoder(out)
+        out = self.transformer_encoder(input)
         return out
     
 
 
 
-# # Define a simple model with 4 ConvTranspose2d layers for upsampling
+# Define a simple model with 4 ConvTranspose2d layers for upsampling
 class Decoder(nn.Module):
-    def __init__(self, 
-                 in_channels:int=768,
-                 num_pixel_classes:int=19):
+    def __init__(self, configs):
         super().__init__()
 
-        self.num_classes = num_pixel_classes
-        self.in_channel = in_channels
+        self.num_classes = configs['Num_Classes']
+        self.in_channel = configs['Embed_Size']
 
         self.layer1 = nn.ConvTranspose2d(self.in_channel, 384, kernel_size=4, stride=2, padding=1)
         self.layer2 = nn.ConvTranspose2d(384, 192, kernel_size=4, stride=2, padding=1)
@@ -140,30 +111,26 @@ class Decoder(nn.Module):
     
 #final model
 class SETR(nn.Module):
-    def __init__(self,
-                 in_channel:int=3,
-                 patch_size:int=16):
+    def __init__(self, configs):
         super().__init__()
 
-        self.in_channel = in_channel
-        self.patch_size = patch_size
+        self.patch_embedding = PatchEmbedding(configs=configs)
 
-
-        self.encoder = Encoder(in_channel=self.in_channel,
-                               patch_size=self.patch_size)
+        self.encoder = Encoder(configs=configs)
         
-        self.decoder = Decoder(num_pixel_classes=19)
+        self.decoder = Decoder(configs=configs)
 
 
     def forward(self, input):
 
         batch_size = input.shape[0]
         # number_of_patches = input.shape[2]**input.shape[3] / self.patch_size**2
-        width_per_patch = int(input.shape[2] / self.patch_size)
+        width_per_patch = int(input.shape[2] / configs['Patch_Size'])
 
         #encoder output is in size of like this:
         #(batch_size, number of patches=64 for imagesize 128*128 and 196 for image size 224*224, embedsize=768)
-        out = self.encoder(input)
+        out = self.patch_embedding(input)
+        out = self.encoder(out)
         
         #out shape is (batch_size, 64=HW/Patchsize**2=number of our patches, 768)
         #but we should feed our images as shape of this(based of paper) (batch_size, 768, 8or16, 8or16)
