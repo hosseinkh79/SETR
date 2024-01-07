@@ -20,7 +20,7 @@ vit_dict = vit.state_dict()
 
 
 configs = {
-    'Image_Width': 112,
+    'Image_Width': 512,
     'InChannel_Size': 3,
     'Patch_Size': 16,
     'Embed_Size': 768,
