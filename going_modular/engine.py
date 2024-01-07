@@ -1,6 +1,6 @@
-from going_modular import configs
-from going_modular.utils import intersection_over_union_multiclass
-import torch.nn.functional as F
+from going_modular.configs import configs
+from going_modular.utils import compute_iou
+
 import torch
 
 
@@ -14,59 +14,91 @@ def one_step_train(model,
     model.train()
 
     train_loss, train_iou = 0, 0
-    for batch, (X, y) in enumerate(train_dataloader):
+    # for batch, (X, y) in enumerate(train_dataloader):
         
-        X, y = X.to(device), y.to(device)
-        y = torch.where(y == -1, torch.tensor(0), y)
+        # X, y = X.to(device), y.to(device)
+        # y = torch.where(y == -1, torch.tensor(0), y)
 
-        #calculate iou
-        # Assuming your target mask is 'target' with shape (batch_size, 1, width, height)
-        logits = model(X)  # Example logits
-        # logits = logits.to(torch.int32)
+        # #calculate iou
+        # # Assuming your target mask is 'target' with shape (batch_size, 1, width, height)
+        # logits = model(X)  # Example logits
+        # # logits = logits.to(torch.int32)
 
-        # Assuming your actual target size is (2, 1, 256, 256)
-        target = y.to(torch.int64)  # Example target mask
+        # # Assuming your actual target size is (2, 1, 256, 256)
+        # target = y.to(torch.int64)  # Example target mask
 
-        # Convert target to one-hot encoded tensor
-        target_onehot = torch.zeros_like(logits)
-        target_onehot.scatter_(1, target, 1)
+        # # Convert target to one-hot encoded tensor
+        # target_onehot = torch.zeros_like(logits)
+        # target_onehot.scatter_(1, target, 1)
 
-        # Apply softmax to get probabilities along the channel dimension
-        probs = F.softmax(logits, dim=1)
+        # # Apply softmax to get probabilities along the channel dimension
+        # probs = F.softmax(logits, dim=1)
 
-        # Convert probabilities to one-hot encoded predictions
-        _, predicted = torch.max(probs, 1)
+        # # Convert probabilities to one-hot encoded predictions
+        # _, predicted = torch.max(probs, 1)
 
-        # Convert predicted to one-hot encoded tensor
-        predicted_onehot = torch.zeros_like(logits)
-        predicted_onehot.scatter_(1, predicted.unsqueeze(1), 1)
+        # # Convert predicted to one-hot encoded tensor
+        # predicted_onehot = torch.zeros_like(logits)
+        # predicted_onehot.scatter_(1, predicted.unsqueeze(1), 1)
 
-        # Compute IoU
-        iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
-        train_iou += iou
+        # # Compute IoU
+        # iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
+        # train_iou += iou
 
 
-        #calculate loss
-        y = y.reshape(-1).long()
+        # #calculate loss
+        # y = y.reshape(-1).long()
 
-        y_pred = model(X)
-        # Reshape the target to (batch_size * height * width)
-        y_pred = y_pred.permute(0, 2, 3, 1).contiguous().view(-1, configs.NUM_CLASSES)
+        # y_pred = model(X)
+        # # Reshape the target to (batch_size * height * width)
+        # y_pred = y_pred.permute(0, 2, 3, 1).contiguous().view(-1, configs.NUM_CLASSES)
 
-        loss = loss_fn(y_pred, y)
-        train_loss += loss.item()
-        # print(f'loss in {batch} is {loss}')
-        # print(f'loss in {batch} is {loss}')
+        # loss = loss_fn(y_pred, y)
+        # train_loss += loss.item()
+        # # print(f'loss in {batch} is {loss}')
+        # # print(f'loss in {batch} is {loss}')
+
+        # optimizer.zero_grad()
+
+        # loss.backward()
+        # optimizer.step()
+
+    for i, (inputs, targets) in enumerate(train_dataloader):
+
+        inputs, targets = inputs.to(device), targets.to(device).to(dtype=torch.int64)
 
         optimizer.zero_grad()
+        outputs = model(inputs)
+        # print(f'shape outputs:{outputs.shape}')
+
+        # Reshape the target mask to (batch_size, height, width)
+        targets = targets.squeeze(1)
+        # print(f'shape targets:{targets.shape}')
+
+        # Calculate CrossEntropy loss
+        loss = loss_fn(outputs, targets)
+        train_loss += loss.item()
+        
 
         loss.backward()
         optimizer.step()
 
-    train_loss = train_loss/len(train_dataloader)
-    test_iou = test_iou/len(train_dataloader)
+        num_classes = configs['Num_Classes']
+        # Convert predictions to class labels
+        predictions = torch.argmax(outputs, dim=1).cpu().numpy()
 
-    return train_loss, test_iou
+        # Assuming targets are already numpy arrays
+        targets = targets.squeeze(1).cpu().numpy()
+
+        # Calculate mIoU for the current batch
+        batch_iou = compute_iou(predictions, targets, num_classes)
+
+        train_iou += batch_iou
+
+    train_loss = train_loss/len(train_dataloader)
+    tain_iou = train_iou/len(train_dataloader)
+
+    return train_loss, tain_iou
 
 
 def one_step_test(model, 
@@ -78,54 +110,77 @@ def one_step_test(model,
     model.eval()
 
     test_loss, test_iou = 0, 0
-
     with torch.inference_mode():
-        for batch, (X, y) in enumerate(test_dataloader):
-                        
-            X, y = X.to(device), y.to(device)
-            y = torch.where(y == -1, torch.tensor(0), y)
+        for i, (inputs, targets) in enumerate(test_dataloader):
 
-            #calculate iou
-            # Assuming your target mask is 'target' with shape (batch_size, 1, width, height)
-            logits = model(X)  # Example logits
-            # logits = logits.to(torch.int32)
+            inputs, targets = inputs.to(device), targets.to(device).to(torch.int64)
 
-            # Assuming your actual target size is (2, 1, 256, 256)
-            target = y.to(torch.int64)  # Example target mask
+            outputs = model(inputs)
 
-            # Convert target to one-hot encoded tensor
-            target_onehot = torch.zeros_like(logits)
-            target_onehot.scatter_(1, target, 1)
+            # Reshape the target mask to (batch_size, height, width)
+            targets = targets.squeeze(1)
 
-            # Apply softmax to get probabilities along the channel dimension
-            probs = F.softmax(logits, dim=1)
-
-            # Convert probabilities to one-hot encoded predictions
-            _, predicted = torch.max(probs, 1)
-
-            # Convert predicted to one-hot encoded tensor
-            predicted_onehot = torch.zeros_like(logits)
-            predicted_onehot.scatter_(1, predicted.unsqueeze(1), 1)
-
-
-            y = y.reshape(-1).long()
-
-            y_pred = model(X)
-            # Reshape the target to (batch_size * height * width)
-            y_pred = y_pred.permute(0, 2, 3, 1).contiguous().view(-1, configs.NUM_CLASSES)
-
-            loss = loss_fn(y_pred, y)
+            # Calculate CrossEntropy loss
+            loss = loss_fn(outputs, targets)
             test_loss += loss.item()
 
-            # Compute IoU
-            iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
-            test_iou += iou
+            num_classes = configs['Num_Classes']
+            # Convert predictions to class labels
+            predictions = torch.argmax(outputs, dim=1).cpu().numpy()
 
+            # Assuming targets are already numpy arrays
+            targets = targets.squeeze(1).cpu().numpy()
 
+            # Calculate mIoU for the current batch
+            batch_iou = compute_iou(predictions, targets, num_classes)
 
+            test_iou += batch_iou
 
     test_iou = test_iou / len(test_dataloader)
     test_loss = test_loss/ len(test_dataloader)
+
+    # with torch.inference_mode():
+            
+        # for batch, (X, y) in enumerate(test_dataloader):
+                        
+            # X, y = X.to(device), y.to(device)
+            # y = torch.where(y == -1, torch.tensor(0), y)
+
+            # #calculate iou
+            # # Assuming your target mask is 'target' with shape (batch_size, 1, width, height)
+            # logits = model(X)  # Example logits
+            # # logits = logits.to(torch.int32)
+
+            # # Assuming your actual target size is (2, 1, 256, 256)
+            # target = y.to(torch.int64)  # Example target mask
+
+            # # Convert target to one-hot encoded tensor
+            # target_onehot = torch.zeros_like(logits)
+            # target_onehot.scatter_(1, target, 1)
+
+            # # Apply softmax to get probabilities along the channel dimension
+            # probs = F.softmax(logits, dim=1)
+
+            # # Convert probabilities to one-hot encoded predictions
+            # _, predicted = torch.max(probs, 1)
+
+            # # Convert predicted to one-hot encoded tensor
+            # predicted_onehot = torch.zeros_like(logits)
+            # predicted_onehot.scatter_(1, predicted.unsqueeze(1), 1)
+
+
+            # y = y.reshape(-1).long()
+
+            # y_pred = model(X)
+            # # Reshape the target to (batch_size * height * width)
+            # y_pred = y_pred.permute(0, 2, 3, 1).contiguous().view(-1, configs.NUM_CLASSES)
+
+            # loss = loss_fn(y_pred, y)
+            # test_loss += loss.item()
+
+            # # Compute IoU
+            # iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
+            # test_iou += iou
 
     return test_loss, test_iou
 
