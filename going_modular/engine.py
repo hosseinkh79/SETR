@@ -135,52 +135,12 @@ def one_step_test(model,
             batch_iou = compute_iou(predictions, targets, num_classes)
 
             test_iou += batch_iou
+            
+            if i%50 == 0:
+                print(i)
 
     test_iou = test_iou / len(test_dataloader)
     test_loss = test_loss/ len(test_dataloader)
-
-    # with torch.inference_mode():
-            
-        # for batch, (X, y) in enumerate(test_dataloader):
-                        
-            # X, y = X.to(device), y.to(device)
-            # y = torch.where(y == -1, torch.tensor(0), y)
-
-            # #calculate iou
-            # # Assuming your target mask is 'target' with shape (batch_size, 1, width, height)
-            # logits = model(X)  # Example logits
-            # # logits = logits.to(torch.int32)
-
-            # # Assuming your actual target size is (2, 1, 256, 256)
-            # target = y.to(torch.int64)  # Example target mask
-
-            # # Convert target to one-hot encoded tensor
-            # target_onehot = torch.zeros_like(logits)
-            # target_onehot.scatter_(1, target, 1)
-
-            # # Apply softmax to get probabilities along the channel dimension
-            # probs = F.softmax(logits, dim=1)
-
-            # # Convert probabilities to one-hot encoded predictions
-            # _, predicted = torch.max(probs, 1)
-
-            # # Convert predicted to one-hot encoded tensor
-            # predicted_onehot = torch.zeros_like(logits)
-            # predicted_onehot.scatter_(1, predicted.unsqueeze(1), 1)
-
-
-            # y = y.reshape(-1).long()
-
-            # y_pred = model(X)
-            # # Reshape the target to (batch_size * height * width)
-            # y_pred = y_pred.permute(0, 2, 3, 1).contiguous().view(-1, configs.NUM_CLASSES)
-
-            # loss = loss_fn(y_pred, y)
-            # test_loss += loss.item()
-
-            # # Compute IoU
-            # iou = intersection_over_union_multiclass(predicted_onehot, target_onehot)
-            # test_iou += iou
 
     return test_loss, test_iou
 
