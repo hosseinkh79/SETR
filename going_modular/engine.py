@@ -136,7 +136,7 @@ def one_step_test(model,
 
             test_iou += batch_iou
             
-            if i%50 == 0:
+            if i % 2 == 0:
                 print(i)
 
     test_iou = test_iou / len(test_dataloader)
