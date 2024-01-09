@@ -47,6 +47,9 @@ def one_step_train(model,
 
         train_iou += batch_iou
 
+        if i % 20 == 0:
+            print(f'train_mode i is: {i}')
+
     train_loss = train_loss/len(train_dataloader)
     tain_iou = train_iou/len(train_dataloader)
 
@@ -87,6 +90,9 @@ def one_step_test(model,
             batch_iou = compute_iou(predictions, targets, num_classes)
 
             test_iou += batch_iou
+
+            if i % 20 == 0:
+                print(f'test_mode i is: {i}')
 
     test_iou = test_iou / len(test_dataloader)
     test_loss = test_loss/ len(test_dataloader)
