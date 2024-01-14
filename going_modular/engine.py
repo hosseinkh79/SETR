@@ -21,11 +21,11 @@ def one_step_train(model,
 
         optimizer.zero_grad()
         outputs = model(inputs)
-        # print(f'shape outputs:{outputs.shape}')
+        # outputs shape : torch.Size([2, 150, 400, 400])
 
         # Reshape the target mask to (batch_size, height, width)
         targets = targets.squeeze(1)
-        # print(f'shape targets:{targets.shape}')
+        # targets shape : torch.Size([2, 400, 400])
 
         # Calculate CrossEntropy loss
         loss = loss_fn(outputs, targets)
@@ -36,19 +36,21 @@ def one_step_train(model,
         optimizer.step()
 
         num_classes = configs['Num_Classes']
-        # Convert predictions to class labels
+        
         predictions = torch.argmax(outputs, dim=1).cpu().numpy()
+        # iou : predictions shape : (batch, image_size, image_size)
 
         # Assuming targets are already numpy arrays
         targets = targets.squeeze(1).cpu().numpy()
+        # iou : targets shape : (batch, image_size, image_size)
 
         # Calculate mIoU for the current batch
         batch_iou = compute_iou(predictions, targets, num_classes)
 
         train_iou += batch_iou
 
-        if i % 20 == 0:
-            print(f'train_mode i is: {i}')
+        # if i % 20 == 0:
+        #     print(f'train_mode i is: {i}')
 
     train_loss = train_loss/len(train_dataloader)
     tain_iou = train_iou/len(train_dataloader)
@@ -71,9 +73,11 @@ def one_step_test(model,
             inputs, targets = inputs.to(device), targets.to(device).to(torch.int64)
 
             outputs = model(inputs)
+            print(f'outputs shape : {outputs.shape}')
 
             # Reshape the target mask to (batch_size, height, width)
             targets = targets.squeeze(1)
+            # print(f'targets shape : {targets.shape}')
 
             # Calculate CrossEntropy loss
             loss = loss_fn(outputs, targets)
@@ -82,17 +86,21 @@ def one_step_test(model,
             num_classes = configs['Num_Classes']
             # Convert predictions to class labels
             predictions = torch.argmax(outputs, dim=1).cpu().numpy()
+            # print(f'iou : predictions shape : {predictions.shape}')
+
 
             # Assuming targets are already numpy arrays
             targets = targets.squeeze(1).cpu().numpy()
+            # print(f'iou : targets shape : {targets.shape}')
+            
 
             # Calculate mIoU for the current batch
             batch_iou = compute_iou(predictions, targets, num_classes)
 
             test_iou += batch_iou
 
-            if i % 20 == 0:
-                print(f'test_mode i is: {i}')
+            # if i % 20 == 0:
+            #     print(f'test_mode i is: {i}')
 
     test_iou = test_iou / len(test_dataloader)
     test_loss = test_loss/ len(test_dataloader)

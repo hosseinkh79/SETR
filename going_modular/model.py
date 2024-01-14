@@ -138,5 +138,7 @@ class SETR(nn.Module):
         out = out.reshape(batch_size, -1, width_per_patch, width_per_patch) 
 
         #our decoder gives ((batch_size, channel_size=768, hight=8, width=8))
-        out = self.decoder(out)
+
+        out = self.decoder(out) # out shape : (batch_size, num_classes, image_hight, image_width)
+        
         return out
